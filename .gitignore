@@ -5,3 +5,6 @@ __pycache__
 Podfile.lock
 Pods
 *.xcworkspace
+dist/
+build/
+*.egg-info
