@@ -13,17 +13,31 @@ import pwd
 import subprocess
 
 
+#
+# TODO:
+# - admin users
+# - SSH enabled users
+# - FV enabled users
+# - securetoken enabled users
+# - print each user with the above status'
+#
+
+
+# TODO: remove
+print("loaded dev")
+
+
+def termy(cmd):
+    task = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    out, err = task.communicate()
+    return(out.decode('utf-8'), err.decode('utf-8'))
+
 def console():
     """Return current or last console user."""
-    def termy(cmd):
-        task = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        out, err = task.communicate()
-        return(out.decode('utf-8'), err.decode('utf-8'))
-    
     user, err = termy([
         '/usr/bin/stat',
         '-f', '"%Su"',
@@ -66,5 +80,3 @@ def users(root=True):
 if __name__ == '__main__':
     print(repr(users()))
     print(repr(console()))
-
-# install into '/Library/Frameworks/Python.framework/Versions/3.7/lib/python3.7/site-packages' or the equivalent Python version's site-packages folder.
