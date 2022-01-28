@@ -1,11 +1,13 @@
-"""Get the macOS console username and/or a list of local non-system users.
+"""
+This module contains utilities to simplify getting user information on macOS.
 
-This module is used to get the current or last logged in console user on macOS
-instead of the user running the script/program. This module can also return a list of
-all local non-system users.
+You can get the current or last logged in console user on macOS instead of the
+user running the script/program. This module can also return a list of all local
+non-system users.
 
-console() - Returns the current or last console user.
-users(root=True) - Returns a list of users.
+Functions
+    console() -- Returns the current or last console user.
+    users(root=True) -- Returns a list of users.
 """
 
 import grp
@@ -27,18 +29,33 @@ import subprocess
 print("loaded dev")
 
 
-def termy(cmd):
+def _termy(cmd):
+    """
+    Run subprocess system commands and return the results as a String.
+    
+    NOTE: This function should be considered private. It may change at any point
+          without consideration outside of this module working.
+    
+    Args:
+        cmd ([Str])-- the command to run as a list of strings.
+    
+    Returns:
+        stdout -- the commands STDOUT as a String.
+        stderr -- the commands STDERR as a String.
+    """
     task = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
-    out, err = task.communicate()
-    return(out.decode('utf-8'), err.decode('utf-8'))
+    stdout, stderr = task.communicate()
+    return stdout.decode('utf-8'), stderr.decode('utf-8')
 
 def console():
-    """Return current or last console user."""
-    user, err = termy([
+    """
+    Return current or last logged in console user as a String.
+    """
+    user, _ = _termy([
         '/usr/bin/stat',
         '-f', '"%Su"',
         '/dev/console'
@@ -50,19 +67,20 @@ def console():
     # if the user is still root after this, root is likely logged in or was the
     # last user to be logged in.
     if user == 'root':
-        user, err = termy([
+        user, _ = _termy([
             "/usr/bin/defaults", "read",
             "/Library/Preferences/com.apple.loginwindow.plist", "lastUserName"
         ])
     
-    user = user.strip()
-    
-    return(str(user))
+    return user.strip()
 
 def users(root=True):
-    """Return a list of local non-system users.
+    """
+    Return a list of local non-system users.
     
-    Set root=False to ignore the root/system user.
+    Args:
+        root (Bool): True by default to include the root user account. Set to
+            False to not include the root account.
     """
     user_names = []
     # by default, all locally created users are in the staff group
@@ -74,7 +92,7 @@ def users(root=True):
         # skip if ignoring root user
         if root == False and u.pw_uid == 0: continue
         user_names.append(u.pw_name)
-    return(user_names)
+    return user_names
 
 
 if __name__ == '__main__':
