@@ -27,41 +27,39 @@ class User:
     
     The following properties can be accessed from this class:
     
-    - username    : The user's username
-    - real_name   : Full name
-    - uid         : The user's ID
-    - gid         : Primary group ID
-    - guid        : Generated user ID - used by APFS
-    - home        : Home folder
-    - shell       : Default shell
-    - admin       : If the user is an admin
-    - ssh_access  : If the user has SSH access
-    - volume_owner: If the user is an APFS volume owner
-    - secure_token: If the user has a secure token
+    - username        : The user's username
+    - real_name       : Full name
+    - uid             : The user's ID
+    - gid             : Primary group ID
+    - guid            : Generated user ID - used by APFS
+    - home            : Home folder
+    - shell           : Default shell
+    - admin           : If the user is an admin
+    - ssh_access      : If the user has SSH access
+    - volume_owner    : If the user is an APFS volume owner
+    - secure_token    : If the user has a secure token
+    - created         : Epoch time when the user was created
+    - password_updated: Epoch time when the user's password was last changed
     """
     
     def __init__(self, username):
-        user_info, _ = _termy(['dscl', '-plist', '.', 'read',
-            f'/Users/{username}',
-            'RealName',
-            'UniqueID',
-            'PrimaryGroupID',
-            'GeneratedUID',
-            'NFSHomeDirectory',
-            'UserShell'],
-            decode=False)
-        ui_plist = plistlib.loads(user_info)
+        user_info, _ = _termy(
+            ['dscl', '-plist', '.', 'read', f'/Users/{username}'], decode=False)
+        self.data = _plist(user_info)
+        # `dscl` nestles a PLIST with some data i want, so i unwrap it here.
+        self.account_policy_data = _plist(_first(
+            self.data.get('dsAttrTypeNative:accountPolicyData', {})))
         
         self.username: str = username
-        self.real_name: str = _first(ui_plist.get('dsAttrTypeStandard:RealName'))
-        self.uid: int = int(_first(ui_plist.get('dsAttrTypeStandard:UniqueID')))
-        self.gid: int = int(_first(ui_plist.get(
+        self.real_name: str = _first(self.data.get('dsAttrTypeStandard:RealName'))
+        self.uid: int = int(_first(self.data.get('dsAttrTypeStandard:UniqueID')))
+        self.gid: int = int(_first(self.data.get(
             'dsAttrTypeStandard:PrimaryGroupID')))
         # guid is used to match the user to APFS volume ownership.
-        self.guid: str = _first(ui_plist.get('dsAttrTypeStandard:GeneratedUID'))
-        self.home: pathlib.Path = _path(_first(ui_plist.get(
+        self.guid: str = _first(self.data.get('dsAttrTypeStandard:GeneratedUID'))
+        self.home: pathlib.Path = _path(_first(self.data.get(
             'dsAttrTypeStandard:NFSHomeDirectory')))
-        self.shell: pathlib.Path = _path(_first(ui_plist.get(
+        self.shell: pathlib.Path = _path(_first(self.data.get(
             'dsAttrTypeStandard:UserShell')))
         self.admin: bool = group_member(self.uid, 'admin')
         self.ssh_access: bool = group_member(self.uid, 'com.apple.access_ssh')
@@ -74,12 +72,16 @@ class User:
         # user.volume_owner # True
         self.volume_owner: bool = apfs_owner(self.guid)
         self.secure_token: bool = secure_token_status(username)
+        self.created: str = self.account_policy_data.get('creationTime')
+        self.password_updated: str = self.account_policy_data.get('passwordLastSetTime')
     
     def dump(self):
         """
         Print all attributes for this User.
         """
         for key, value in self.__dict__.items():
+            if key == 'data': continue
+            if key == 'account_policy_data': continue
             print(f"{key}: {value}")
 
 def _termy(cmd, decode=True):
@@ -137,6 +139,23 @@ def _path(path: str) -> pathlib.Path:
         if path.exists():
             return path
     return None
+
+def _plist(data: str) -> dict:
+    """
+    Returns a dict object from the input plist data.
+    
+    NOTE: This function should be considered private. It may change at any point
+          without consideration outside of this module working.
+    
+    Args:
+        data (str|bytes): A string (encoded or not) of plist data.
+    
+    Returns: A dict object with the plist data if valid, otherwise an empty dict.
+    """
+    if not data: return {}
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    return plistlib.loads(data)
 
 def primary() -> User:
     """
@@ -333,6 +352,7 @@ def secure_token_status(username: str) -> bool:
     if 'Secure token is ENABLED' in err:
         return True
     return False
+
 
 if __name__ == '__main__':
     for user in users():
