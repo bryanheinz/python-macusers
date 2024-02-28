@@ -75,6 +75,37 @@ class User:
         self.created: str = self.account_policy_data.get('creationTime')
         self.password_updated: str = self.account_policy_data.get('passwordLastSetTime')
     
+    def fv_access(self) -> bool:
+        """
+        Return if a user has FileVault access. This is a shortcut for calling fv_access('USERNAME').
+        
+        NOTE: Requires running with sudo/root. Because of this, it was left outside
+              of the User class.
+        
+        Returns: True if the user has FileVault access, False if not, None if run
+            without sudo.
+        """
+        return fv_access(self.username)
+    
+    def apfs_owner(self, volume: str = '/') -> bool:
+        """
+        Return if a user is a volume owner. This is a shortcut for calling apfs_owner(User.guid).
+        
+        Args:
+            volume (str): The volume to check. Defaults to /.
+        
+        Returns: True of the user is listed as a volume owner, False otherwise.
+        """
+        return apfs_owner(self.guid, volume)
+    
+    def secure_token_status(self) -> bool:
+        """
+        Return if a user has a secure token. This is a shortcut for calling secure_token_status('USERNAME').
+        
+        Returns: True if the user has a secure token, False otherwise.
+        """
+        return secure_token_status(self.username)
+    
     def dump(self):
         """
         Print all attributes for this User.
@@ -292,7 +323,7 @@ def console() -> str:
     
     return user.strip()
 
-def fv_status(username: str) -> bool:
+def fv_access(username: str) -> bool:
     """
     Return if a user has FileVault access.
     
@@ -322,7 +353,7 @@ def fv_status(username: str) -> bool:
 
 def apfs_owner(guid: str, volume: str = '/') -> bool:
     """
-    Return if a user is a volume owner
+    Return if a user is a volume owner.
     
     Args:
         guid   (str): The GeneratedUID of the user to check.
@@ -361,4 +392,4 @@ if __name__ == '__main__':
     print(repr(console()))
     print(repr(primary().username))
     print([admin.username for admin in admins()])
-    print(fv_status('bryanh')) # only works if run as root
+    print(fv_access('bryanh')) # only works if run as root
