@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project attempts to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.0.0 -
+## v1.0.0 - 2024-02-28
 
 ### Added
 
@@ -13,7 +13,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 - `primary()` function to supersede `console()`
 - `admins()` function to return a list of admin `User()`
 - `group_member()` function to check if a user is in a group
-- `fv_status()` function to check if a user has FileVault access
+- `fv_access()` function to check if a user has FileVault access
 - `apfs_owner()` function to check if a user is an APFS volume owner
 - `secure_token_status()` function to check if the user has a secure token
 - `users()` function can now filter by primary group IDs
