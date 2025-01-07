@@ -14,9 +14,10 @@ import pathlib
 import plistlib
 import subprocess
 import warnings
+from typing import Any, Union, Optional, cast
 
-APFS_LIST = None
-FDE_LIST = None
+APFS_LIST: Optional[str] = None
+FDE_LIST: Optional[str] = None
 
 class User:
     """
@@ -57,9 +58,9 @@ class User:
             'dsAttrTypeStandard:PrimaryGroupID')))
         # guid is used to match the user to APFS volume ownership.
         self.guid: str = _first(self.data.get('dsAttrTypeStandard:GeneratedUID'))
-        self.home: pathlib.Path = _path(_first(self.data.get(
+        self.home: Optional[pathlib.Path] = _path(_first(self.data.get(
             'dsAttrTypeStandard:NFSHomeDirectory')))
-        self.shell: pathlib.Path = _path(_first(self.data.get(
+        self.shell: Optional[pathlib.Path] = _path(_first(self.data.get(
             'dsAttrTypeStandard:UserShell')))
         self.admin: bool = group_member(self.uid, 'admin')
         self.ssh_access: bool = group_member(self.uid, 'com.apple.access_ssh')
@@ -72,10 +73,10 @@ class User:
         # user.volume_owner # True
         self.volume_owner: bool = apfs_owner(self.guid)
         self.secure_token: bool = secure_token_status(username)
-        self.created: str = self.account_policy_data.get('creationTime')
-        self.password_updated: str = self.account_policy_data.get('passwordLastSetTime')
+        self.created: Optional[str] = self.account_policy_data.get('creationTime')
+        self.password_updated: Optional[str] = self.account_policy_data.get('passwordLastSetTime')
     
-    def fv_access(self) -> bool:
+    def fv_access(self) -> Optional[bool]:
         """
         Return if a user has FileVault access. This is a shortcut for calling fv_access('USERNAME').
         
@@ -115,7 +116,7 @@ class User:
             if key == 'account_policy_data': continue
             print(f"{key}: {value}")
 
-def _termy(cmd, decode=True):
+def _termy(cmd, decode=True) -> tuple[Union[bytes,str], Union[bytes,str]]:
     """
     Run subprocess system commands and return the results as a String.
     
@@ -139,7 +140,7 @@ def _termy(cmd, decode=True):
         return comp.stdout.decode('utf-8'), comp.stderr.decode('utf-8')
     return comp.stdout, comp.stderr
 
-def _first(item: list) -> any:
+def _first(item: Optional[list[Any]]) -> Any:
     """
     Return the first item in a list.
     
@@ -153,7 +154,7 @@ def _first(item: list) -> any:
     """
     return next(iter(item or []), None)
 
-def _path(path: str) -> pathlib.Path:
+def _path(path: Optional[str]) -> Optional[pathlib.Path]:
     """
     Returns a pathlib.Path object if the input path exists.
     
@@ -166,12 +167,12 @@ def _path(path: str) -> pathlib.Path:
     Returns: A pathlib.Path object if the path exists or None.
     """
     if path:
-        path = pathlib.Path(path)
-        if path.exists():
-            return path
+        _path = pathlib.Path(path)
+        if _path.exists():
+            return _path
     return None
 
-def _plist(data: str) -> dict:
+def _plist(data: Union[str, bytes]) -> dict:
     """
     Returns a dict object from the input plist data.
     
@@ -202,6 +203,7 @@ def primary() -> User:
         '/dev/console'
     ])
     
+    username = cast(str, username)
     username = username.replace('"', '')
     
     # fallback in case user is still root
@@ -217,7 +219,7 @@ def primary() -> User:
     
     return user
 
-def users(root: bool = True, gid: int = None) -> [User]:
+def users(root: bool = True, gid: Optional[int] = None) -> list[User]:
     """
     Return a list of users with a shell.
     
@@ -237,10 +239,11 @@ def users(root: bool = True, gid: int = None) -> [User]:
         >> [bryan.heinz, morris.moss]
     """
     user_list = []
-    dscl_users, _ = _termy(['dscl', '.', 'list', '/Users', 'UserShell'])
-    for _ in dscl_users.splitlines():
-        if 'false' in _: continue
-        username = _.split(' ')[0]
+    dscl_users, _x = _termy(['dscl', '.', 'list', '/Users', 'UserShell'])
+    for line in dscl_users.splitlines():
+        _line = cast(str, line)
+        if 'false' in _line: continue
+        username = _line.split(' ')[0]
         user_list.append(User(username))
     if gid is not None:
         return list(filter(lambda u: u.gid == gid, user_list))
@@ -248,7 +251,7 @@ def users(root: bool = True, gid: int = None) -> [User]:
         return list(filter(lambda u: u.username != 'root', user_list))
     return user_list
 
-def admins(root: bool = True, gid: int = None) -> [User]:
+def admins(root: bool = True, gid: Optional[int] = None) -> list[User]:
     """
     Returns a list admin users with a shell.
     
@@ -271,7 +274,7 @@ def admins(root: bool = True, gid: int = None) -> [User]:
     admin_list = list(filter(lambda u: u.admin is True, user_list))
     return admin_list
 
-def group_member(uid: str, group: str) -> bool:
+def group_member(uid: int, group: str) -> bool:
     """
     Check if a user is in a group.
     
@@ -289,6 +292,7 @@ def group_member(uid: str, group: str) -> bool:
     """
     output, _ = _termy(
         ['dsmemberutil', 'checkmembership', '-u', str(uid), '-G', group])
+    output = cast(str, output)
     if 'is a member' in output:
         return True
     return False
@@ -310,6 +314,7 @@ def console() -> str:
         '/dev/console'
     ])
     
+    user = cast(str, user)
     user = user.replace('"', '')
     
     # fallback in case user is still root
@@ -320,10 +325,11 @@ def console() -> str:
             "/usr/bin/defaults", "read",
             "/Library/Preferences/com.apple.loginwindow.plist", "lastUserName"
         ])
+        user = cast(str, user)
     
     return user.strip()
 
-def fv_access(username: str) -> bool:
+def fv_access(username: str) -> Optional[bool]:
     """
     Return if a user has FileVault access.
     
@@ -339,12 +345,14 @@ def fv_access(username: str) -> bool:
     # using a global to speed up subsequent FDE checks.
     global FDE_LIST
     if FDE_LIST is None:
-        FDE_LIST, err = _termy(['fdesetup', 'list'])
-    if 'requires root access' in err:
-        warnings.warn(
-            "Getting FileVault status requires this script to run as admin.",
-            RuntimeWarning, stacklevel=2)
-        FDE_LIST = ''
+        _fde_list, _err = _termy(['fdesetup', 'list'])
+        FDE_LIST = cast(str, _fde_list)
+        err: str = cast(str, _err)
+        if 'requires root access' in err:
+            warnings.warn(
+                "Getting FileVault status requires this script to run as admin.",
+                RuntimeWarning, stacklevel=2)
+            FDE_LIST = ''
     if FDE_LIST == '':
         return None
     if username in FDE_LIST:
@@ -364,7 +372,8 @@ def apfs_owner(guid: str, volume: str = '/') -> bool:
     # getting the APFS owner list is slow. using a global here to make the call once to speed up subsequent user checks.
     global APFS_LIST
     if APFS_LIST is None:
-        APFS_LIST, _ = _termy(['diskutil', 'apfs', 'listUsers', volume])
+        _apfs_list, _ = _termy(['diskutil', 'apfs', 'listUsers', volume])
+        APFS_LIST = cast(str, _apfs_list)
     if guid in APFS_LIST:
         return True
     return False
@@ -379,7 +388,8 @@ def secure_token_status(username: str) -> bool:
     Returns: True if the user has a secure token, False otherwise.
     """
     # for some reason this commands sends output to stderr instead of stdout...
-    _, err = _termy(['sysadminctl', '-secureTokenStatus', username])
+    _, _err = _termy(['sysadminctl', '-secureTokenStatus', username])
+    err: str = cast(str, _err)
     if 'Secure token is ENABLED' in err:
         return True
     return False
