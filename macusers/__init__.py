@@ -14,7 +14,7 @@ import pathlib
 import plistlib
 import subprocess
 import warnings
-from typing import Any, Union, Optional, cast
+from typing import Any, Optional, Union
 
 APFS_LIST: Optional[str] = None
 FDE_LIST: Optional[str] = None
@@ -44,9 +44,10 @@ class User:
     """
     
     def __init__(self, username):
-        user_info, _ = _termy(
-            ['dscl', '-plist', '.', 'read', f'/Users/{username}'], decode=False)
-        self.data = _plist(user_info)
+        comp = subprocess.run(
+            ['dscl', '-plist', '.', 'read', f'/Users/{username}'],
+            capture_output=True, check=False)
+        self.data = _plist(comp.stdout)
         # `dscl` nestles a PLIST with some data i want, so i unwrap it here.
         self.account_policy_data = _plist(_first(
             self.data.get('dsAttrTypeNative:accountPolicyData', {})))
@@ -116,30 +117,6 @@ class User:
             if key == 'account_policy_data': continue
             print(f"{key}: {value}")
 
-def _termy(cmd, decode=True) -> tuple[Union[bytes,str], Union[bytes,str]]:
-    """
-    Run subprocess system commands and return the results as a String.
-    
-    NOTE: This function should be considered private. It may change at any point
-          without consideration outside of this module working.
-    
-    Args:
-        cmd ([str]): the command to run as a list of strings.
-    
-    Returns:
-        stdout -- the commands STDOUT as a String.
-        stderr -- the commands STDERR as a String.
-    """
-    try:
-        comp = subprocess.run(cmd, capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        if e.returncode == 11 and 'requires root access' in e.stderr.decode('utf-8'):
-            return e.stdout.decode('utf-8'), e.stderr.decode('utf-8')
-        raise e
-    if decode:
-        return comp.stdout.decode('utf-8'), comp.stderr.decode('utf-8')
-    return comp.stdout, comp.stderr
-
 def _first(item: Optional[list[Any]]) -> Any:
     """
     Return the first item in a list.
@@ -197,23 +174,23 @@ def primary() -> User:
     
     Returns: The best-guess primary user as a User class.
     """
-    username, _ = _termy([
-        '/usr/bin/stat',
-        '-f', '"%Su"',
-        '/dev/console'
-    ])
+    comp = subprocess.run(
+        ['/usr/bin/stat', '-f', '"%Su"', '/dev/console'],
+        capture_output=True, check=False)
+    username: str = comp.stdout.decode('utf-8')
     
-    username = cast(str, username)
     username = username.replace('"', '')
     
     # fallback in case user is still root
     # if the user is still root after this, root is likely logged in or was the
     # last user to be logged in.
     if username == 'root':
-        username, _ = _termy([
-            "/usr/bin/defaults", "read",
-            "/Library/Preferences/com.apple.loginwindow.plist", "lastUserName"
-        ])
+        comp = subprocess.run(
+            ["/usr/bin/defaults", "read",
+            "/Library/Preferences/com.apple.loginwindow.plist",
+            "lastUserName"],
+            capture_output=True, check=False)
+        username = comp.stdout.decode('utf-8')
     
     user = User(username.strip())
     
@@ -239,11 +216,13 @@ def users(root: bool = True, gid: Optional[int] = None) -> list[User]:
         >> [bryan.heinz, morris.moss]
     """
     user_list = []
-    dscl_users, _x = _termy(['dscl', '.', 'list', '/Users', 'UserShell'])
+    comp = subprocess.run(
+        ['dscl', '.', 'list', '/Users', 'UserShell'],
+        capture_output=True, check=False)
+    dscl_users: str = comp.stdout.decode('utf-8')
     for line in dscl_users.splitlines():
-        _line = cast(str, line)
-        if 'false' in _line: continue
-        username = _line.split(' ')[0]
+        if 'false' in line: continue
+        username = line.split(' ')[0]
         user_list.append(User(username))
     if gid is not None:
         return list(filter(lambda u: u.gid == gid, user_list))
@@ -290,9 +269,14 @@ def group_member(uid: int, group: str) -> bool:
         > macusers.group_member(501, 'com.apple.access_ssh')
         >> False
     """
-    output, _ = _termy(
-        ['dsmemberutil', 'checkmembership', '-u', str(uid), '-G', group])
-    output = cast(str, output)
+    comp = subprocess.run(
+        ['dsmemberutil', 'checkmembership', '-u', str(uid), '-G', group],
+        capture_output=True, check=False)
+    output: str = comp.stdout.decode('utf-8')
+    if 'group not found' in output.lower():
+        warnings.warn(
+            "Getting FileVault status requires this script to run as admin.", RuntimeWarning,
+            stacklevel=2)
     if 'is a member' in output:
         return True
     return False
@@ -308,24 +292,22 @@ def console() -> str:
         "console() is deprecated, use primary().username for similar functionality.",
         DeprecationWarning, stacklevel=2)
     
-    user, _ = _termy([
-        '/usr/bin/stat',
-        '-f', '"%Su"',
-        '/dev/console'
-    ])
-    
-    user = cast(str, user)
+    comp = subprocess.run(
+        ['/usr/bin/stat', '-f', '"%Su"', '/dev/console'],
+        capture_output=True, check=False)
+    user: str = comp.stdout.decode('utf-8')
     user = user.replace('"', '')
     
     # fallback in case user is still root
     # if the user is still root after this, root is likely logged in or was the
     # last user to be logged in.
     if user == 'root':
-        user, _ = _termy([
-            "/usr/bin/defaults", "read",
-            "/Library/Preferences/com.apple.loginwindow.plist", "lastUserName"
-        ])
-        user = cast(str, user)
+        comp = subprocess.run(
+            ["/usr/bin/defaults", "read",
+            "/Library/Preferences/com.apple.loginwindow.plist",
+            "lastUserName"],
+            capture_output=True, check=False)
+        user = comp.stdout.decode('utf-8')
     
     return user.strip()
 
@@ -345,9 +327,11 @@ def fv_access(username: str) -> Optional[bool]:
     # using a global to speed up subsequent FDE checks.
     global FDE_LIST
     if FDE_LIST is None:
-        _fde_list, _err = _termy(['fdesetup', 'list'])
-        FDE_LIST = cast(str, _fde_list)
-        err: str = cast(str, _err)
+        comp = subprocess.run(
+            ['fdesetup', 'list'],
+            capture_output=True, check=False)
+        FDE_LIST = comp.stdout.decode('utf-8')
+        err: str = comp.stderr.decode('utf-8')
         if 'requires root access' in err:
             warnings.warn(
                 "Getting FileVault status requires this script to run as admin.",
@@ -372,8 +356,10 @@ def apfs_owner(guid: str, volume: str = '/') -> bool:
     # getting the APFS owner list is slow. using a global here to make the call once to speed up subsequent user checks.
     global APFS_LIST
     if APFS_LIST is None:
-        _apfs_list, _ = _termy(['diskutil', 'apfs', 'listUsers', volume])
-        APFS_LIST = cast(str, _apfs_list)
+        comp = subprocess.run(
+            ['diskutil', 'apfs', 'listUsers', volume],
+            capture_output=True, check=False)
+        APFS_LIST = comp.stdout.decode('utf-8')
     if guid in APFS_LIST:
         return True
     return False
@@ -388,8 +374,10 @@ def secure_token_status(username: str) -> bool:
     Returns: True if the user has a secure token, False otherwise.
     """
     # for some reason this commands sends output to stderr instead of stdout...
-    _, _err = _termy(['sysadminctl', '-secureTokenStatus', username])
-    err: str = cast(str, _err)
+    comp = subprocess.run(
+        ['sysadminctl', '-secureTokenStatus', username],
+        capture_output=True, check=False)
+    err: str = comp.stderr.decode('utf-8')
     if 'Secure token is ENABLED' in err:
         return True
     return False
