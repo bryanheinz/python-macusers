@@ -275,7 +275,7 @@ def group_member(uid: int, group: str) -> bool:
     output: str = comp.stdout.decode('utf-8')
     if 'group not found' in output.lower():
         warnings.warn(
-            "Getting FileVault status requires this script to run as admin.", RuntimeWarning,
+            f"The group '{group}' wasn't found.", RuntimeWarning,
             stacklevel=2)
     if 'is a member' in output:
         return True
