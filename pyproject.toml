@@ -1,6 +1,22 @@
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "macusers"
+version = "1.0.1"
+description = "Get the macOS console username and/or a list of local non-system users."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
 ]
-build-backend = "setuptools.build_meta"
+authors = [{ name = "Bryan Heinz", email = "pypi@bryanheinz.com" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/bryanheinz/python-macusers"
+Repository = "https://github.com/bryanheinz/python-macusers.git"
+Changelog = "https://github.com/bryanheinz/python-macusers/blob/main/changelog.md"
