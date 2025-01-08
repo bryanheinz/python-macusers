@@ -14,7 +14,7 @@ import pathlib
 import plistlib
 import subprocess
 import warnings
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 APFS_LIST: Optional[str] = None
 FDE_LIST: Optional[str] = None
@@ -117,7 +117,7 @@ class User:
             if key == 'account_policy_data': continue
             print(f"{key}: {value}")
 
-def _first(item: Optional[list[Any]]) -> Any:
+def _first(item: Optional[List[Any]]) -> Any:
     """
     Return the first item in a list.
     
@@ -196,7 +196,7 @@ def primary() -> User:
     
     return user
 
-def users(root: bool = True, gid: Optional[int] = None) -> list[User]:
+def users(root: bool = True, gid: Optional[int] = None) -> List[User]:
     """
     Return a list of users with a shell.
     
@@ -230,7 +230,7 @@ def users(root: bool = True, gid: Optional[int] = None) -> list[User]:
         return list(filter(lambda u: u.username != 'root', user_list))
     return user_list
 
-def admins(root: bool = True, gid: Optional[int] = None) -> list[User]:
+def admins(root: bool = True, gid: Optional[int] = None) -> List[User]:
     """
     Returns a list admin users with a shell.
     
