@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project attempts to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.1
+
+- Removed internal `_termy()` function
+- Refactored subprocess commands
+- Fixed various typing bugs
+
+Subprocess no longer checks the success of the command.
+
+### Project Changes
+
+- Migrated to `uv`
+- Migrated to `hatchling` build system
+- Removed `setup.py`
+
 ## v1.0.0 - 2024-02-28
 
 ### Added
